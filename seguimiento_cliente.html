@@ -1,0 +1,733 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mascota Point — Panel de Seguimiento</title>
+  <!-- SheetJS para procesar Excel y Google Sheets CSV -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --wa: #25d366;
+      --wa-dark: #1ea952;
+      --sheets: #0f9d58;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; }
+    .container { max-width: 1420px; margin: 0 auto; }
+    
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .header-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    h1 { font-size: 1.35rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+    
+    /* Box de vinculacion Google Sheets */
+    .sync-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .sync-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; font-weight: 700; color: #166534; }
+    .sync-row { display: flex; gap: 10px; align-items: center; }
+    .sync-input { flex: 1; padding: 8px 12px; border: 1px solid #86efac; border-radius: 6px; font-size: 0.85rem; background: white; }
+    .sync-input:focus { outline: 2px solid var(--sheets); border-color: transparent; }
+    .btn-sync { background: var(--sheets); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.15s; white-space: nowrap; }
+    .btn-sync:hover { opacity: 0.9; }
+
+    .drop-zone {
+      border: 2px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .drop-zone:hover { border-color: var(--primary); background: #f0f9ff; }
+    .drop-zone p { font-size: 0.9rem; font-weight: 600; color: #334155; }
+    .drop-zone span { font-size: 0.78rem; color: #94a3b8; }
+
+    /* Seccion Customizador de Mensajes */
+    .customizer-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    .customizer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .customizer-title { font-size: 0.88rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 6px; }
+    .tags-helper { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .tag-btn { background: #e2e8f0; color: #0f172a; font-family: monospace; font-size: 0.78rem; font-weight: 600; padding: 4px 9px; border-radius: 4px; cursor: pointer; border: 1px solid #cbd5e1; transition: 0.15s; }
+    .tag-btn:hover { background: #cbd5e1; }
+    .tag-btn.special { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+    
+    .presets-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .preset-label { font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; }
+    .preset-btn { background: white; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; color: #334155; cursor: pointer; font-weight: 500; transition: 0.15s; }
+    .preset-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    textarea.template-area { width: 100%; height: 105px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem; resize: vertical; font-family: inherit; line-height: 1.45; }
+    textarea.template-area:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+    .preview-box { margin-top: 8px; padding: 10px 14px; background: #e2e8f0; border-radius: 6px; font-size: 0.82rem; color: #334155; }
+    .preview-box strong { color: #0f172a; display: block; margin-bottom: 4px; }
+    .preview-content { white-space: pre-line; font-family: inherit; color: #1e293b; }
+
+    .filters-bar { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap: 12px; margin-top: 16px; align-items: end; }
+    label { display: block; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: white; }
+    input:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+    .metrics-bar { display: flex; gap: 10px; margin-top: 14px; font-size: 0.82rem; font-weight: 600; flex-wrap: wrap; }
+    .pill { padding: 4px 10px; border-radius: 20px; background: #e2e8f0; color: #334155; }
+    .pill.green { background: #dcfce7; color: #15803d; }
+    .pill.blue { background: #e0f2fe; color: #0369a1; }
+    .pill.amber { background: #fef3c7; color: #b45309; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; text-align: left; }
+    th { background: #f1f5f9; padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 2px solid var(--border); position: sticky; top: 0; }
+    td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+
+    tr:hover { background-color: #f8fafc; }
+    tr.sent { background-color: #f0fdf4 !important; }
+    tr.invalid { opacity: 0.5; background-color: #fafafa; }
+
+    .btn-wa { display: inline-flex; align-items: center; gap: 6px; background: var(--wa); color: white; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; white-space: nowrap; transition: 0.15s; }
+    .btn-wa:hover { background: var(--wa-dark); }
+    .btn-wa.done { background: #64748b; }
+
+    .prod-tag { display: inline-block; background: #f1f5f9; color: #334155; padding: 2px 6px; border-radius: 4px; font-size: 0.74rem; margin: 1px 2px; max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge { font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .badge-ok { background: #dcfce7; color: #166534; }
+    .badge-no { background: #fee2e2; color: #991b1b; }
+    .btn-clear { background: #f1f5f9; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+    <div class="header-title">
+      <h1>\u{1F43E} Mascota Point — Seguimiento y Vencimientos</h1>
+      <span style="font-size: 0.8rem; color: #64748b;">Compatible con vencimientos.xlsx, Libro1.xlsx y Sheets</span>
+    </div>
+
+    <!-- Vinculación con Google Sheets en vivo -->
+    <div class="sync-box">
+      <div class="sync-header">
+        <span>\u{1F4CA} Conectar directamente a Google Sheets (Sin descargar archivos)</span>
+        <small style="color: #15803d; font-weight: normal;">*El documento debe tener acceso "Cualquier persona con el enlace"</small>
+      </div>
+      <div class="sync-row">
+        <input type="text" id="sheetsUrlInput" class="sync-input" placeholder="Pegá acá el enlace de tu Google Sheets (ej: https://docs.google.com/spreadsheets/d/.../edit)">
+        <button class="btn-sync" onclick="sincronizarGoogleSheets()">\u{1F504} Sincronizar Ahora</button>
+      </div>
+    </div>
+
+    <!-- Drag & drop para Excel local -->
+    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+      <p>📁 Arrastrá acá tu archivo Excel <strong>vencimientos.xlsx</strong> o <strong>Libro1.xlsx</strong> (o hacé clic)</p>
+      <span>Detecta encabezados, limpia teléfonos, precios (P.Unit), cantidades y formatea los nombres automáticamente.</span>
+      <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none;" onchange="procesarArchivoLocal(event)">
+    </div>
+
+    <!-- Personalizador de Mensaje -->
+    <div class="customizer-box" id="customizerBox">
+      <div class="customizer-header">
+        <div class="customizer-title">\u{1F4AC} Personalizar Mensaje de WhatsApp</div>
+        <button class="btn-clear" style="padding: 3px 8px; font-size: 0.75rem;" onclick="aplicarPreset(1)">Restablecer plantilla</button>
+      </div>
+
+      <!-- Presets de mensajes rápidos -->
+      <div class="presets-row">
+        <span class="preset-label">Plantillas rápidas:</span>
+        <button class="preset-btn" onclick="aplicarPreset(1)">\u{1F4CB} Lista Detallada (Recomendado)</button>
+        <button class="preset-btn" onclick="aplicarPreset(2)">\u{1F6D2} Reposición Simple</button>
+        <button class="preset-btn" onclick="aplicarPreset(3)">\u{1F431} Piedritas / Sanitario</button>
+        <button class="preset-btn" onclick="aplicarPreset(4)">\u{1F381} Promoción / Mayorista</button>
+      </div>
+
+      <!-- Variables dinámicas clickeables -->
+      <div class="tags-helper">
+        <span class="preset-label">Insertar variable:</span>
+        <button class="tag-btn" onclick="insertarTag('{nombre}')">{nombre}</button>
+        <button class="tag-btn special" onclick="insertarTag('{lista_productos}')" title="Genera la lista con viñetas de todo lo que llevó en su última fecha">\u{1F4CB} {lista_productos}</button>
+        <button class="tag-btn" onclick="insertarTag('{producto}')">{producto}</button>
+        <button class="tag-btn" onclick="insertarTag('{fecha}')">{fecha}</button>
+        <button class="tag-btn" onclick="insertarTag('{vendedor}')">{vendedor}</button>
+      </div>
+
+      <textarea id="customTemplate" class="template-area" oninput="actualizarPreview(); filtrarYRenderizar();"></textarea>
+
+      <div class="preview-box">
+        <strong>Vista previa en tiempo real:</strong>
+        <div class="preview-content" id="previewText"></div>
+      </div>
+    </div>
+
+    <!-- Barra de Configuración y Filtros -->
+    <div class="filters-bar" id="filtersArea" style="display:none;">
+      <div>
+        <label>Buscar Cliente, Teléfono o Producto</label>
+        <input type="text" id="searchInput" placeholder="Escribí para buscar..." oninput="filtrarYRenderizar()">
+      </div>
+      <div>
+        <label>Vendedor</label>
+        <select id="sellerFilter" onchange="filtrarYRenderizar()">
+          <option value="">Todos los vendedores</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Estado Contacto</label>
+        <select id="statusFilter" onchange="filtrarYRenderizar()">
+          <option value="all">Todos los clientes</option>
+          <option value="pending">Pendientes de envío</option>
+          <option value="sent">Enviados</option>
+          <option value="valid">Solo con WhatsApp válido</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn-clear" onclick="limpiarTodo()">Reiniciar</button>
+      </div>
+    </div>
+
+    <!-- Métricas del reporte -->
+    <div class="metrics-bar" id="metricsBar" style="display:none;">
+      <span class="pill" id="mTotalRows">Filas: 0</span>
+      <span class="pill blue" id="mTotalClients">Clientes agrupados: 0</span>
+      <span class="pill green" id="mValidClients">WhatsApp válidos: 0</span>
+      <span class="pill amber" id="mSent">Enviados hoy: 0</span>
+      <span class="pill" style="background:#fef3c7; color:#92400e; font-weight:700;">📲 Línea Activa: 1158510680</span>
+    </div>
+  </div>
+
+  <!-- Tabla de Contactos -->
+  <div class="card" id="tableContainer" style="display:none; overflow-x: auto;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 45px;">#</th>
+          <th>Cliente (ID)</th>
+          <th>Primer Nombre</th>
+          <th>Teléfono Original</th>
+          <th>WhatsApp Limpio</th>
+          <th>Últimos Productos Llevados</th>
+          <th>Fecha Compra</th>
+          <th>Vendedor</th>
+          <th style="text-align: right;">Acción</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let rawClients = [];
+  let sentSet = new Set();
+
+  const EMOJI_HUG = "\u{1F917}";
+  const EMOJI_CAT = "\u{1F431}";
+  const EMOJI_DOG = "\u{1F436}";
+  const EMOJI_PAW = "\u{1F43E}";
+  const EMOJI_BOX = "\u{1F4E6}";
+  const EMOJI_CHECK = "\u{2705}";
+  const EMOJI_WA = "\u{1F4F2}";
+
+  const presets = {
+    1: `Hola {nombre}, buenas! Te hablo de Mascota Point ${EMOJI_HUG}\nVimos que en tu última compra llevaste:\n{lista_productos}\n\nQueríamos saber si andabas necesitando reposición de alimento o piedritas ${EMOJI_CAT}${EMOJI_DOG}`,
+    2: `Hola {nombre}, buenas! Te hablo de Mascota Point ${EMOJI_HUG} Queríamos saber si andabas necesitando reposición de {producto}.`,
+    3: `Hola {nombre}! Cómo estás? Te escribimos de Mascota Point ${EMOJI_PAW}\nTe consultamos si precisás reposición de piedritas o balanceado para los consentidos de la casa.`,
+    4: `Buenas {nombre}! Te escribo de Mascota Point ${EMOJI_PAW}\nTenemos promociones activas para compras de esta semana en:\n{lista_productos}\nTe paso la lista de precios actualizada?`
+  };
+
+  // Limpieza integral del producto: quita precios P.Unit, descuentos, códigos de barra y formatea cantidades
+  function limpiarProductoCompleto(rawDesc, cant) {
+    if (!rawDesc) return "";
+    let s = rawDesc.toString().trim();
+
+    let sLower = s.toLowerCase();
+    // Filtro de servicios que no son productos
+    const descartes = ['envio', 'descuento', 'bonificacion', 'qr con el', 'muestra'];
+    if (descartes.some(d => sLower.includes(d))) return "";
+
+    // Eliminar fragmentos de precios y descuentos como "P.Unit: 9454 Dto: 20%"
+    s = s.replace(/P\.Unit:.*$/i, '').trim();
+
+    // Eliminar códigos de barra largos al final
+    s = s.replace(/\b\d{12,20}\b/g, '').trim();
+
+    // Eliminar código numérico repetido al inicio (ej: "8942   Piedras...")
+    s = s.replace(/^\d{3,6}\s+/, '').trim();
+
+    // Si tiene palabras repetidas ("Orejas Orejas Orejas" -> "Orejas x 3")
+    let words = s.split(/\s+/);
+    if (words.length >= 2 && new Set(words.map(w => w.toLowerCase())).size === 1) {
+      s = `${words[0]} x ${words.length}`;
+    }
+
+    // Agregar cantidad si vino informada y es mayor a 1
+    let cNum = parseInt(cant, 10);
+    if (!isNaN(cNum) && cNum > 1 && !/x\s*\d+$/i.test(s)) {
+      s = `${s} (x${cNum})`;
+    }
+
+    return s.trim();
+  }
+
+  function aplicarPreset(id) {
+    document.getElementById('customTemplate').value = presets[id];
+    actualizarPreview();
+    filtrarYRenderizar();
+  }
+
+  function insertarTag(tag) {
+    const area = document.getElementById('customTemplate');
+    const start = area.selectionStart;
+    const end = area.selectionEnd;
+    const text = area.value;
+    area.value = text.substring(0, start) + tag + text.substring(end);
+    area.focus();
+    area.selectionStart = area.selectionEnd = start + tag.length;
+    actualizarPreview();
+    filtrarYRenderizar();
+  }
+
+  function actualizarPreview() {
+    const template = document.getElementById('customTemplate').value;
+    const sampleList = "• BIANCAT BENTONITA WHITE & GREY X 5KGS BIDON (x2)\n• DR COSSIA SUPER PREMIUM 15 KG";
+    let preview = template
+      .replace(/{nombre}/g, "Maria")
+      .replace(/{lista_productos}/g, sampleList)
+      .replace(/{producto}/g, "BIANCAT BENTONITA WHITE & GREY X 5KGS BIDON (x2)")
+      .replace(/{fecha}/g, "20/08")
+      .replace(/{vendedor}/g, "ventas");
+    document.getElementById('previewText').innerText = preview;
+  }
+
+  function limpiarNumeroArg(rawTel) {
+    if (!rawTel) return "";
+    let s = rawTel.toString().trim();
+    let chunks = s.split(/[\/\+]/).map(c => c.replace(/[^\d]/g, '')).filter(c => c.length >= 8);
+    let candidate = "";
+
+    if (chunks.length > 0) {
+      let mobile = chunks.find(c => c.startsWith('11') || c.startsWith('15') || c.startsWith('549'));
+      candidate = mobile || chunks[0];
+    } else {
+      candidate = s.replace(/[^\d]/g, '');
+    }
+
+    candidate = candidate.replace(/00$/, '');
+    if (!candidate || candidate.length < 8) return "";
+
+    if (candidate.startsWith('549')) return candidate;
+    if (candidate.startsWith('54')) return '549' + candidate.substring(2);
+    if (candidate.startsWith('15') && candidate.length === 10) candidate = '11' + candidate.substring(2);
+    if (candidate.startsWith('0')) candidate = candidate.substring(1);
+
+    return '549' + candidate;
+  }
+
+  // Extrae el primer nombre distinguiendo si el archivo trae "Nombre" (Nombre Apellido) o "Cliente" (Apellido Nombre)
+  function extraerPrimerNombre(texto, esNombreDirecto) {
+    if (!texto) return "cliente";
+    let s = texto.toString().trim().replace(/[,]/g, '');
+    s = s.split('(')[0].trim();
+    let parts = s.split(/\s+/);
+    if (parts.length === 1) return parts[0];
+
+    // Si viene de columna 'Nombre' (ej: Maria Carolina Caballero -> Maria)
+    if (esNombreDirecto) {
+      return parts[0];
+    }
+
+    // Si viene de columna 'Cliente' (ej: Chervonko Juliana -> Juliana)
+    const sulfijos = ['sa', 's.a.', 'srl', 's.r.l.', 'sh', 'pet', 'distribuidora', 'veterinaria'];
+    if (sulfijos.includes(parts[1].toLowerCase())) return parts[0];
+    return parts[1];
+  }
+
+  // Parser universal de fechas (soporta serial Excel, ISO YYYY-MM-DD y DD/MM/YYYY)
+  function parsearFechaUniversal(val) {
+    if (!val) return { time: 0, text: "" };
+    if (val instanceof Date) {
+      let d = String(val.getDate()).padStart(2, '0');
+      let m = String(val.getMonth() + 1).padStart(2, '0');
+      let y = val.getFullYear();
+      return { time: val.getTime(), text: `${d}/${m}/${y}` };
+    }
+
+    // Serial de Excel (ej: 46254.678)
+    if (typeof val === 'number') {
+      let jsDate = new Date(Math.round((val - 25569) * 86400 * 1000));
+      let d = String(jsDate.getDate()).padStart(2, '0');
+      let m = String(jsDate.getMonth() + 1).padStart(2, '0');
+      let y = jsDate.getFullYear();
+      return { time: jsDate.getTime(), text: `${d}/${m}/${y}` };
+    }
+
+    let s = val.toString().trim();
+
+    // String numérico serial
+    let numVal = parseFloat(s);
+    if (!isNaN(numVal) && numVal > 30000 && numVal < 70000 && !s.includes('/') && !s.includes('-')) {
+      let jsDate = new Date(Math.round((numVal - 25569) * 86400 * 1000));
+      let d = String(jsDate.getDate()).padStart(2, '0');
+      let m = String(jsDate.getMonth() + 1).padStart(2, '0');
+      let y = jsDate.getFullYear();
+      return { time: jsDate.getTime(), text: `${d}/${m}/${y}` };
+    }
+
+    // ISO: YYYY-MM-DD o YYYY-MM-DD HH:MM:SS
+    if (s.includes('-')) {
+      let parts = s.split(' ');
+      let dParts = parts[0].split('-');
+      if (dParts.length === 3) {
+        if (dParts[0].length === 4) { // YYYY-MM-DD
+          let tParts = (parts[1] || '00:00:00').split(':');
+          let jsDate = new Date(dParts[0], dParts[1] - 1, dParts[2], tParts[0] || 0, tParts[1] || 0, tParts[2] || 0);
+          return { time: jsDate.getTime(), text: `${dParts[2]}/${dParts[1]}/${dParts[0]}` };
+        } else { // DD-MM-YYYY
+          let tParts = (parts[1] || '00:00:00').split(':');
+          let jsDate = new Date(dParts[2], dParts[1] - 1, dParts[0], tParts[0] || 0, tParts[1] || 0, tParts[2] || 0);
+          return { time: jsDate.getTime(), text: `${dParts[0]}/${dParts[1]}/${dParts[2]}` };
+        }
+      }
+    }
+
+    // DD/MM/YYYY o YYYY/MM/DD
+    if (s.includes('/')) {
+      let parts = s.split(' ');
+      let dParts = parts[0].split('/');
+      if (dParts.length === 3) {
+        if (dParts[0].length === 4) { // YYYY/MM/DD
+          let tParts = (parts[1] || '00:00:00').split(':');
+          let jsDate = new Date(dParts[0], dParts[1] - 1, dParts[2], tParts[0] || 0, tParts[1] || 0, tParts[2] || 0);
+          return { time: jsDate.getTime(), text: `${dParts[2]}/${dParts[1]}/${dParts[0]}` };
+        } else { // DD/MM/YYYY
+          let tParts = (parts[1] || '00:00:00').split(':');
+          let jsDate = new Date(dParts[2], dParts[1] - 1, dParts[0], tParts[0] || 0, tParts[1] || 0, tParts[2] || 0);
+          return { time: jsDate.getTime(), text: `${dParts[0]}/${dParts[1]}/${dParts[2]}` };
+        }
+      }
+    }
+
+    let parsed = Date.parse(s);
+    return { time: isNaN(parsed) ? 0 : parsed, text: s };
+  }
+
+  // --- SINCRONIZACIÓN GOOGLE SHEETS ---
+  async function sincronizarGoogleSheets() {
+    const inputUrl = document.getElementById('sheetsUrlInput').value.trim();
+    if (!inputUrl) {
+      alert("Por favor, pegá el enlace de tu Google Sheets.");
+      return;
+    }
+
+    localStorage.setItem('mascota_point_sheets_url', inputUrl);
+
+    const match = inputUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match || !match[1]) {
+      alert("El enlace no parece un enlace válido de Google Sheets.");
+      return;
+    }
+
+    const sheetId = match[1];
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+
+    const btn = document.querySelector('.btn-sync');
+    btn.innerHTML = '⏳ Conectando...';
+
+    try {
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error("Error de red");
+      const csvText = await response.text();
+      const workbook = XLSX.read(csvText, { type: 'string' });
+      procesarWorkbook(workbook);
+
+      btn.innerHTML = '✅ ¡Sincronizado!';
+      setTimeout(() => btn.innerHTML = '\u{1F504} Sincronizar Ahora', 2000);
+    } catch (err) {
+      console.error(err);
+      alert("No se pudo sincronizar el Google Sheet.\n\nAsegurate de que en Google Sheets el documento esté compartido como 'Cualquier persona con el enlace (Lector)'.");
+      btn.innerHTML = '\u{1F504} Sincronizar Ahora';
+    }
+  }
+
+  function procesarArchivoLocal(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const data = new Uint8Array(ev.target.result);
+      // cellDates: true permite que SheetJS procese fechas nativas sin romperlas
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      procesarWorkbook(workbook);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function procesarWorkbook(workbook) {
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // Detección dinámica y ultra robusta de cabeceras
+    let headerRow = -1;
+    let idxId = -1, idxNombre = -1, idxTel = -1, idxFecha = -1, idxDesc = -1, idxCant = -1, idxTipo = -1, idxVendedor = -1, idxLinea = -1;
+    let esNombreDirecto = true;
+
+    for (let i = 0; i < Math.min(json.length, 12); i++) {
+      const row = json[i] || [];
+      let tempId = -1, tempNombre = -1, tempTel = -1, tempFecha = -1, tempDesc = -1;
+
+      for (let j = 0; j < row.length; j++) {
+        let val = (row[j] || "").toString().trim().toLowerCase();
+        if (!val) continue;
+
+        if (val.includes('id_cliente') || val.includes('id cliente')) tempId = j;
+        else if (val === 'nombre' || val === 'nombre y apellido' || val === 'cliente / nombre') { tempNombre = j; esNombreDirecto = true; }
+        else if (val.includes('cliente') && !val.includes('id')) { tempNombre = j; esNombreDirecto = false; }
+        
+        if (val.includes('tel') || val.includes('cel')) tempTel = j;
+        if (val.includes('fecha')) tempFecha = j;
+        if (val.includes('desc') || val.includes('articulo') || val.includes('producto')) tempDesc = j;
+        if (val.includes('cant') || val.includes('unidades')) idxCant = j;
+        if (val.includes('tipo') || val.includes('rubro') || val.includes('categoria')) idxTipo = j;
+        if (val.includes('usuario') || val.includes('vendedor')) idxVendedor = j;
+        if (val.includes('linea') || val.includes('numero') || val.includes('emisora') || val.includes('asignado')) idxLinea = j;
+      }
+
+      // Si encontramos al menos Nombre/Cliente y Teléfono (o Fecha y Teléfono), esta es la cabecera real
+      if ((tempNombre !== -1 || tempId !== -1) && tempTel !== -1) {
+        headerRow = i;
+        idxId = tempId;
+        idxNombre = tempNombre;
+        idxTel = tempTel;
+        idxFecha = tempFecha;
+        idxDesc = tempDesc;
+        break;
+      }
+    }
+
+    if (headerRow === -1) {
+      // Fallback a primera fila si no detectó palabras clave
+      headerRow = 0;
+      idxId = 0; idxNombre = 1; idxTel = 3; idxFecha = 4; idxDesc = 7; idxCant = 8;
+    }
+
+    let totalFilasOriginales = json.length - (headerRow + 1);
+    const clientsMap = new Map();
+    const sellersSet = new Set();
+
+    for (let i = headerRow + 1; i < json.length; i++) {
+      const row = json[i];
+      if (!row || row.length === 0) continue;
+
+      const rawId = (idxId !== -1 && row[idxId] !== undefined) ? row[idxId] : "";
+      const rawNombre = (idxNombre !== -1 && row[idxNombre] !== undefined) ? row[idxNombre].toString().trim() : "";
+      const idCliente = rawId || rawNombre;
+
+      if (!idCliente && !rawNombre) continue;
+
+      const rawTel = (idxTel !== -1 && row[idxTel] !== undefined) ? row[idxTel] : "";
+      const rawFecha = (idxFecha !== -1 && row[idxFecha] !== undefined) ? row[idxFecha] : "";
+      const rawCant = (idxCant !== -1 && row[idxCant] !== undefined) ? row[idxCant] : 1;
+      const rawDesc = (idxDesc !== -1 && row[idxDesc] !== undefined) ? row[idxDesc] : "";
+
+      const descLimpia = limpiarProductoCompleto(rawDesc, rawCant);
+      const vendedor = (idxVendedor !== -1 && row[idxVendedor] !== undefined) ? row[idxVendedor].toString().trim() : "ventas";
+
+      if (vendedor) sellersSet.add(vendedor);
+
+      // Parsear fecha universal
+      const parsedDate = parsearFechaUniversal(rawFecha);
+
+      // Asignación exclusiva a Línea 1
+      let lineaAsignada = "1158510680";
+
+      if (!clientsMap.has(idCliente)) {
+        clientsMap.set(idCliente, {
+          id: idCliente,
+          lineaEmisora: lineaAsignada,
+          cliente: rawNombre || `Cliente #${idCliente}`,
+          nombrePila: extraerPrimerNombre(rawNombre, esNombreDirecto),
+          telefonoRaw: rawTel,
+          telefonoLimpio: limpiarNumeroArg(rawTel),
+          fecha: parsedDate.text,
+          fechaTime: parsedDate.time,
+          vendedor: vendedor,
+          productos: [],
+          ultimosProductos: []
+        });
+      }
+
+      const clientData = clientsMap.get(idCliente);
+
+      // Actualizar si encontramos una fecha más reciente
+      if (parsedDate.time > clientData.fechaTime) {
+        clientData.fechaTime = parsedDate.time;
+        clientData.fecha = parsedDate.text;
+        clientData.ultimosProductos = [];
+        if (vendedor) clientData.vendedor = vendedor;
+        if (rawTel && !clientData.telefonoLimpio) {
+          clientData.telefonoRaw = rawTel;
+          clientData.telefonoLimpio = limpiarNumeroArg(rawTel);
+        }
+      }
+
+      if (descLimpia) {
+        if (!clientData.productos.includes(descLimpia)) {
+          clientData.productos.push(descLimpia);
+        }
+        if (parsedDate.time === clientData.fechaTime && !clientData.ultimosProductos.includes(descLimpia)) {
+          clientData.ultimosProductos.push(descLimpia);
+        }
+      }
+    }
+
+    rawClients = Array.from(clientsMap.values());
+
+    const sellerSelect = document.getElementById('sellerFilter');
+    sellerSelect.innerHTML = '<option value="">Todos los vendedores</option>';
+    sellersSet.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.innerText = s;
+      sellerSelect.appendChild(opt);
+    });
+
+    document.getElementById('mTotalRows').innerText = `Filas: ${totalFilasOriginales}`;
+    document.getElementById('mTotalClients').innerText = `Clientes: ${rawClients.length}`;
+    document.getElementById('mValidClients').innerText = `WhatsApp válidos: ${rawClients.filter(c => c.telefonoLimpio.length >= 12).length}`;
+
+    document.getElementById('filtersArea').style.display = 'grid';
+    document.getElementById('metricsBar').style.display = 'flex';
+    document.getElementById('tableContainer').style.display = 'block';
+
+    actualizarPreview();
+    filtrarYRenderizar();
+  }
+
+  function filtrarYRenderizar() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    const seller = document.getElementById('sellerFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const template = document.getElementById('customTemplate').value;
+
+    const filtrados = rawClients.filter(c => {
+      if (seller && c.vendedor !== seller) return false;
+
+      const isSent = sentSet.has(c.id);
+      const hasValidTel = c.telefonoLimpio.length >= 12;
+
+      if (status === 'pending' && (!hasValidTel || isSent)) return false;
+      if (status === 'sent' && !isSent) return false;
+      if (status === 'valid' && !hasValidTel) return false;
+
+      if (q) {
+        const matchName = c.cliente.toLowerCase().includes(q);
+        const matchTel = c.telefonoLimpio.includes(q) || (c.telefonoRaw && c.telefonoRaw.toString().includes(q));
+        const matchProd = c.productos.some(p => p.toLowerCase().includes(q));
+        if (!matchName && !matchTel && !matchProd) return false;
+      }
+
+      return true;
+    });
+
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    filtrados.forEach((c, idx) => {
+      const isSent = sentSet.has(c.id);
+      const hasValidTel = c.telefonoLimpio.length >= 12;
+
+      let prodsRecientes = (c.ultimosProductos && c.ultimosProductos.length > 0) ? c.ultimosProductos : c.productos;
+      
+      let listaConVinetas = prodsRecientes.map(p => `• ${p}`).join('\n');
+      if (!listaConVinetas) listaConVinetas = "• Alimento balanceado / piedritas";
+
+      let prodUnico = prodsRecientes.length > 0 ? prodsRecientes[0] : "alimento o piedritas";
+      let fechaCorta = c.fecha ? c.fecha.split(' ')[0].substring(0, 5) : "";
+
+      let textoMensaje = template
+        .replace(/{nombre}/g, c.nombrePila)
+        .replace(/{lista_productos}/g, listaConVinetas)
+        .replace(/{producto}/g, prodUnico)
+        .replace(/{fecha}/g, fechaCorta)
+        .replace(/{vendedor}/g, c.vendedor);
+
+      let waUrl = hasValidTel ? `https://wa.me/${c.telefonoLimpio}?text=${encodeURIComponent(textoMensaje)}` : '#';
+
+      const tr = document.createElement('tr');
+      if (isSent) tr.className = 'sent';
+      else if (!hasValidTel) tr.className = 'invalid';
+
+      const prodsHtml = prodsRecientes.map(p => `<span class="prod-tag" title="${p}">${EMOJI_BOX} ${p}</span>`).join(' ');
+
+      tr.innerHTML = `
+        <td style="color:#64748b;">${idx + 1}</td>
+        <td><strong>${c.cliente}</strong> <small style="color:#94a3b8;">(#${c.id})</small></td>
+        <td><span style="color:#0284c7; font-weight:600;">${c.nombrePila}</span></td>
+        <td style="color:#64748b; font-family: monospace; font-size:0.8rem;">${c.telefonoRaw || '—'}</td>
+        <td style="font-family: monospace; font-weight: 700;">${hasValidTel ? c.telefonoLimpio : '—'}</td>
+        <td>${prodsHtml || '<span style="color:#94a3b8;">Sin detalle</span>'}</td>
+        <td style="font-size: 0.78rem; color: #64748b;">${c.fecha || '—'}</td>
+        <td><span class="badge" style="background:#e0f2fe; color:#0369a1;">${c.vendedor}</span></td>
+        <td style="text-align: right;">
+          ${hasValidTel ? 
+            `<a href="${waUrl}" target="_blank" class="btn-wa ${isSent ? 'done' : ''}" onclick="marcarEnvio('${c.id}', this)">
+              ${isSent ? EMOJI_CHECK + ' Reenviar' : EMOJI_WA + ' WhatsApp'}
+             </a>` : 
+            `<span class="badge badge-no">Sin número</span>`
+          }
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('mSent').innerText = `Enviados hoy: ${sentSet.size}`;
+  }
+
+  function marcarEnvio(id, el) {
+    sentSet.add(id);
+    filtrarYRenderizar();
+  }
+
+  function limpiarTodo() {
+    document.getElementById('fileInput').value = '';
+    document.getElementById('searchInput').value = '';
+    rawClients = [];
+    sentSet.clear();
+    document.getElementById('filtersArea').style.display = 'none';
+    document.getElementById('metricsBar').style.display = 'none';
+    document.getElementById('tableContainer').style.display = 'none';
+  }
+
+  window.onload = function() {
+    const savedUrl = localStorage.getItem('mascota_point_sheets_url');
+    if (savedUrl) {
+      document.getElementById('sheetsUrlInput').value = savedUrl;
+    }
+    aplicarPreset(1);
+  };
+</script>
+
+</body>
+</html>
